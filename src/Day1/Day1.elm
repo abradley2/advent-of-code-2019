@@ -16,22 +16,6 @@ type alias Solution =
     Result String String
 
 
-allOrNothing : List (Result a b) -> Result a (List b)
-allOrNothing =
-    List.foldl
-        (\next result ->
-            case result of
-                Result.Err err ->
-                    Result.Err err
-
-                Result.Ok okResults ->
-                    Result.map
-                        (List.singleton >> List.append okResults)
-                        next
-        )
-        (Result.Ok [])
-
-
 computeFuel : Int -> Int
 computeFuel mass =
     (toFloat mass / 3.0)
@@ -60,7 +44,7 @@ partOne =
         >> -- parse into integers
            List.map (String.toInt >> Result.fromMaybe "could not parse all inputs")
         >> -- validate input
-           allOrNothing
+           ResultX.combine
         >> -- compute fuel needed per each line of mass
            Result.map (List.map computeFuel)
         >> -- add it all up
@@ -76,7 +60,7 @@ partTwo =
         >> -- parse into integers
            List.map (String.toInt >> Result.fromMaybe "could not parse all inputs")
         >> -- validate input
-           allOrNothing
+           ResultX.combine
         >> -- compute fuel needed per each line of mass
            Result.map (List.map computeFuel)
         >> -- compute fuel for fuel
