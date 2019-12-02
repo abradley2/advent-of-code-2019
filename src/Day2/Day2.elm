@@ -21,6 +21,26 @@ partOne input =
     Result.Err input
 
 
+
+{-
+   99 = finished
+   1 adds together numbers read from two positions and stores the result in a third position
+
+   The three integers immediately after the opcode tell you these three positions
+   - first two =  the two positions to read from
+   - third position to store output
+
+   1, 10, 20, 30
+
+   Add x(10) + y(10) and store at 30
+
+   opcode 2 does the same but multiplies instead of adding
+
+   When you see an opcode, move to the next one by stepping forward 4 positions
+
+-}
+
+
 solve : Problem -> Solution
 solve problem =
     case problem.part of
