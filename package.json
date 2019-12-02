@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "Day1": "parcel serve ./src/Day1/index.html"
+    "Day1": "parcel serve ./src/Day1/index.html",
+    "Day2": "parcel serve ./src/Day2/index.html"
   },
   "author": "",
   "license": "ISC",
