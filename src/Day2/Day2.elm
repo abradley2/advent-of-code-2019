@@ -166,8 +166,9 @@ partTwo input inputPrefix =
 solve : Problem -> Solution
 solve problem =
     case problem.part of
-        -- 1 ->
-        --     partOne problem.input
+        1 ->
+            partOne problem.input
+
         2 ->
             partTwo problem.input { noun = 0, verb = 0 }
 
