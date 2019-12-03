@@ -1,5 +1,7 @@
 module Day2 exposing (main)
 
+import Array exposing (Array)
+import Basics.Extra exposing (flip)
 import Browser exposing (element)
 import Html as H
 import Platform exposing (Program)
@@ -16,34 +18,110 @@ type alias Solution =
     Result String String
 
 
+inputToArray : String -> Result String (Array Int)
+inputToArray =
+    String.split ","
+        >> List.map String.toInt
+        >> List.map (Result.fromMaybe "Could not parse input")
+        >> ResultX.combine
+        >> Result.map Array.fromList
+
+
+type alias Operands =
+    { x : Int
+    , y : Int
+    , pos : Int
+    }
+
+
+prepareInput : Array Int -> Array Int
+prepareInput =
+    -- replace position 1 with the value 12 and replace position 2 with the value 2.
+    Array.set 1 12
+        >> Array.set 2 2
+
+
+resolveOperands : Int -> Array Int -> Operands -> (Int -> Int -> Int) -> Result String (Array Int)
+resolveOperands currentPlace array operands operation =
+    let
+        resultValue =
+            operation operands.x operands.y
+
+        resultArray =
+            Array.set operands.pos resultValue array
+    in
+    Result.Ok resultArray
+
+
+valueFromPos : Int -> Array Int -> Maybe Int
+valueFromPos pos array =
+    Array.get pos array
+        |> Maybe.andThen (flip Array.get <| array)
+
+
+readArray : Int -> Array Int -> Result String (Array Int)
+readArray currentPlace array =
+    let
+        mCurrentOp =
+            Array.get currentPlace array
+
+        mOperands =
+            Maybe.map3
+                Operands
+                (valueFromPos (currentPlace + 1) array)
+                (valueFromPos (currentPlace + 2) array)
+                (Array.get (currentPlace + 3) array)
+
+        next =
+            currentPlace + 4
+    in
+    case ( mCurrentOp, mOperands ) of
+        ( Just currentOp, Just operands ) ->
+            case currentOp of
+                1 ->
+                    resolveOperands currentPlace array operands (+)
+                        |> Result.andThen (readArray next)
+
+                2 ->
+                    resolveOperands currentPlace array operands (*)
+                        |> Result.andThen (readArray next)
+
+                99 ->
+                    Result.Ok array
+
+                _ ->
+                    Result.Err "Unknown operator"
+
+        ( Just currentOp, Nothing ) ->
+            case currentOp of
+                99 ->
+                    Result.Ok array
+
+                _ ->
+                    Result.Err "out of index"
+
+        -- no more operations
+        _ ->
+            Result.Err "Out of index"
+
+
 partOne : String -> Solution
 partOne input =
-    Result.Err input
-
-
-
-{-
-   99 = finished
-   1 adds together numbers read from two positions and stores the result in a third position
-
-   The three integers immediately after the opcode tell you these three positions
-   - first two =  the two positions to read from
-   - third position to store output
-
-   1, 10, 20, 30
-
-   Add x(10) + y(10) and store at 30
-
-   opcode 2 does the same but multiplies instead of adding
-
-   When you see an opcode, move to the next one by stepping forward 4 positions
-
--}
+    inputToArray input
+        |> Result.map prepareInput
+        |> Result.andThen (readArray 0)
+        |> Result.map Array.toList
+        |> Result.map (List.map String.fromInt)
+        |> Result.map (List.intersperse ",")
+        |> Result.map (List.foldr (++) "")
 
 
 solve : Problem -> Solution
 solve problem =
     case problem.part of
+        0 ->
+            partOne problem.input
+
         1 ->
             partOne problem.input
 
