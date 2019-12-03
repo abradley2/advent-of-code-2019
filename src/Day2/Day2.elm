@@ -150,21 +150,17 @@ partTwo input inputPrefix =
                 |> Result.map Array.toList
                 |> Result.map (List.map String.fromInt)
                 |> Result.andThen (List.head >> Result.fromMaybe "No result")
+                |> Result.withDefault "0"
+
+        nextPrefix =
+            incrementInputPrefix inputPrefix
+                |> Result.withDefault { noun = 0, verb = 0 }
     in
-    case result of
-        Result.Ok solved ->
-            if solved == "19690720" then
-                Result.Ok (String.fromInt <| 100 * inputPrefix.noun + inputPrefix.verb)
+    if result == "19690720" then
+        Result.Ok (String.fromInt <| 100 * inputPrefix.noun + inputPrefix.verb)
 
-            else
-                Result.andThen
-                    (partTwo input)
-                    (incrementInputPrefix inputPrefix)
-
-        Result.Err _ ->
-            Result.andThen
-                (partTwo input)
-                (incrementInputPrefix inputPrefix)
+    else
+        partTwo input nextPrefix
 
 
 solve : Problem -> Solution
