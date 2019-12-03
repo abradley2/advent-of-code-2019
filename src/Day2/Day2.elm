@@ -34,11 +34,35 @@ type alias Operands =
     }
 
 
-prepareInput : Array Int -> Array Int
-prepareInput =
+prepareInput : InputPrefix -> Array Int -> Array Int
+prepareInput prefix =
     -- replace position 1 with the value 12 and replace position 2 with the value 2.
-    Array.set 1 12
-        >> Array.set 2 2
+    Array.set 1 prefix.noun
+        >> Array.set 2 prefix.verb
+
+
+type alias InputPrefix =
+    { noun : Int
+    , verb : Int
+    }
+
+
+incrementInputPrefix : InputPrefix -> Result String InputPrefix
+incrementInputPrefix prefix =
+    case prefix.verb of
+        99 ->
+            let
+                next =
+                    { noun = prefix.noun + 1, verb = 0 }
+            in
+            if next.noun == 99 then
+                Result.Err "Exceeded last possibility, (99, 99)"
+
+            else
+                Result.Ok next
+
+        _ ->
+            Result.Ok { noun = prefix.noun, verb = prefix.verb + 1 }
 
 
 resolveOperands : Int -> Array Int -> Operands -> (Int -> Int -> Int) -> Result String (Array Int)
@@ -108,7 +132,7 @@ readArray currentPlace array =
 partOne : String -> Solution
 partOne input =
     inputToArray input
-        |> Result.map prepareInput
+        |> Result.map (prepareInput (InputPrefix 12 2))
         |> Result.andThen (readArray 0)
         |> Result.map Array.toList
         |> Result.map (List.map String.fromInt)
@@ -116,14 +140,40 @@ partOne input =
         |> Result.map (List.foldr (++) "")
 
 
+partTwo : String -> InputPrefix -> Solution
+partTwo input inputPrefix =
+    let
+        result =
+            inputToArray input
+                |> Result.map (prepareInput inputPrefix)
+                |> Result.andThen (readArray 0)
+                |> Result.map Array.toList
+                |> Result.map (List.map String.fromInt)
+                |> Result.andThen (List.head >> Result.fromMaybe "No result")
+    in
+    case result of
+        Result.Ok solved ->
+            if solved == "19690720" then
+                Result.Ok (String.fromInt <| 100 * inputPrefix.noun + inputPrefix.verb)
+
+            else
+                Result.andThen
+                    (partTwo input)
+                    (incrementInputPrefix inputPrefix)
+
+        Result.Err _ ->
+            Result.andThen
+                (partTwo input)
+                (incrementInputPrefix inputPrefix)
+
+
 solve : Problem -> Solution
 solve problem =
     case problem.part of
-        0 ->
-            partOne problem.input
-
-        1 ->
-            partOne problem.input
+        -- 1 ->
+        --     partOne problem.input
+        2 ->
+            partTwo problem.input { noun = 0, verb = 0 }
 
         _ ->
             Result.Err
