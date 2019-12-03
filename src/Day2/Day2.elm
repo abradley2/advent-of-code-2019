@@ -136,8 +136,7 @@ partOne input =
         |> Result.andThen (readArray 0)
         |> Result.map Array.toList
         |> Result.map (List.map String.fromInt)
-        |> Result.map (List.intersperse ",")
-        |> Result.map (List.foldr (++) "")
+        |> Result.andThen (List.head >> Result.fromMaybe "Output was empty")
 
 
 partTwo : String -> InputPrefix -> Solution
@@ -150,17 +149,30 @@ partTwo input inputPrefix =
                 |> Result.map Array.toList
                 |> Result.map (List.map String.fromInt)
                 |> Result.andThen (List.head >> Result.fromMaybe "No result")
-                |> Result.withDefault "0"
 
         nextPrefix =
             incrementInputPrefix inputPrefix
-                |> Result.withDefault { noun = 0, verb = 0 }
     in
-    if result == "19690720" then
-        Result.Ok (String.fromInt <| 100 * inputPrefix.noun + inputPrefix.verb)
+    case ( result, nextPrefix ) of
+        ( Result.Ok output, Result.Ok prefix ) ->
+            if output == "19690720" then
+                Result.Ok (String.fromInt <| 100 * inputPrefix.noun + inputPrefix.verb)
 
-    else
-        partTwo input nextPrefix
+            else
+                partTwo input prefix
+
+        ( Result.Err _, Result.Ok prefix ) ->
+            partTwo input prefix
+
+        ( Result.Ok output, Result.Err _ ) ->
+            if output == "19690720" then
+                Result.Ok (String.fromInt <| 100 * inputPrefix.noun + inputPrefix.verb)
+
+            else
+                Result.Err "Could not find any match and went out of index"
+
+        _ ->
+            Result.Err "Could not solve"
 
 
 solve : Problem -> Solution
