@@ -32,14 +32,12 @@ type alias Instruction =
 
 
 type alias Coords =
-    { x : Int
-    , y : Int
-    }
+    ( Int, Int )
 
 
 centralPort : Coords
 centralPort =
-    Coords 500 500
+    ( 500, 500 )
 
 
 parseInstruction : Parser Instruction
@@ -64,9 +62,104 @@ lineToInstructions input =
         |> ResultX.combine
 
 
+getRange : Int -> Int -> (Int -> Int) -> List Int -> List Int
+getRange start end reduce acc =
+    let
+        n =
+            reduce start
+
+        nList =
+            acc ++ [ n ]
+    in
+    if n == end then
+        nList
+
+    else
+        getRange n end reduce acc
+
+
 instructionToCoords : Instruction -> InstructionGenerator -> InstructionGenerator
 instructionToCoords instruction acc =
-    acc
+    let
+        ( curX, curY ) =
+            acc.currentCoords
+    in
+    case instruction.direction of
+        Up ->
+            let
+                range =
+                    getRange curY (curY - instruction.length) (\v -> v - 1) []
+
+                ( coords, currentCoords ) =
+                    List.foldl
+                        (\nextY ( coordSet, _ ) ->
+                            let
+                                latest =
+                                    ( nextY, curX )
+                            in
+                            ( Set.insert latest coordSet, latest )
+                        )
+                        ( Set.empty, acc.currentCoords )
+                        range
+            in
+            { coords = coords, currentCoords = currentCoords }
+
+        Down ->
+            let
+                range =
+                    getRange curY (curY - instruction.length) (\v -> v + 1) []
+
+                ( coords, currentCoords ) =
+                    List.foldl
+                        (\nextY ( coordSet, _ ) ->
+                            let
+                                latest =
+                                    ( nextY, curX )
+                            in
+                            ( Set.insert latest coordSet, latest )
+                        )
+                        ( Set.empty, acc.currentCoords )
+                        range
+            in
+            { coords = coords, currentCoords = currentCoords }
+
+        Left ->
+            let
+                range =
+                    getRange curX (curX - instruction.length) (\v -> v - 1) []
+
+                ( coords, currentCoords ) =
+                    List.foldl
+                        (\nextX ( coordSet, _ ) ->
+                            let
+                                latest =
+                                    ( curY, nextX )
+                            in
+                            ( Set.insert latest coordSet, latest )
+                        )
+                        ( Set.empty, acc.currentCoords )
+                        range
+            in
+            { coords = coords, currentCoords = currentCoords }
+
+        Right ->
+            let
+                range =
+                    getRange curX (curX - instruction.length) (\v -> v + 1) []
+
+                ( coords, currentCoords ) =
+                    List.foldl
+                        (\nextX ( coordSet, _ ) ->
+                            let
+                                latest =
+                                    ( curY, nextX )
+                            in
+                            ( Set.insert latest coordSet, latest )
+                        )
+                        ( Set.empty, acc.currentCoords )
+                        range
+            in
+            { coords = coords, currentCoords = currentCoords }
 
 
 type alias InstructionGenerator =
@@ -103,6 +196,9 @@ partOne input =
                     |> Result.andThen lineToInstructions
                     |> Result.map instructionsToCoords
                 )
+
+        l =
+            Debug.log "wires = " wires
     in
     Result.Ok "wip"
 
