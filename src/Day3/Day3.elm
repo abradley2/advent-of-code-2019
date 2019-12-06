@@ -15,8 +15,8 @@ type alias Problem =
     }
 
 
-type alias Solution a =
-    Result String (H.Html a)
+type alias Solution =
+    Result String String
 
 
 type Direction
@@ -38,7 +38,7 @@ type alias Coords =
 
 centralPort : Coords
 centralPort =
-    ( 8, 1 )
+    ( 0, 0 )
 
 
 parseInstruction : Parser Instruction
@@ -86,81 +86,94 @@ instructionToCoords instruction acc =
                 range =
                     getRange curY (curY - instruction.length)
 
-                ( coords, currentCoords ) =
+                ( coords, orderedCoords, currentCoords ) =
                     List.foldl
-                        (\nextY ( coordSet, _ ) ->
+                        (\nextY ( coordSet, prevOrderedCoords, _ ) ->
                             let
                                 latest =
                                     ( curX, nextY )
                             in
-                            ( Set.insert latest coordSet, latest )
+                            ( Set.insert latest coordSet, prevOrderedCoords, latest )
                         )
-                        ( Set.empty, acc.currentCoords )
+                        ( Set.empty, [], acc.currentCoords )
                         range
             in
-            { coords = Set.union coords acc.coords, currentCoords = currentCoords }
+            { coords = Set.union coords acc.coords
+            , currentCoords = currentCoords
+            , orderedCoords = orderedCoords
+            }
 
         Down ->
             let
                 range =
                     getRange curY (curY + instruction.length)
 
-                ( coords, currentCoords ) =
+                ( coords, orderedCoords, currentCoords ) =
                     List.foldl
-                        (\nextY ( coordSet, _ ) ->
+                        (\nextY ( coordSet, prevOrderedCoords, _ ) ->
                             let
                                 latest =
                                     ( curX, nextY )
                             in
-                            ( Set.insert latest coordSet, latest )
+                            ( Set.insert latest coordSet, prevOrderedCoords, latest )
                         )
-                        ( Set.empty, acc.currentCoords )
+                        ( Set.empty, [], acc.currentCoords )
                         range
             in
-            { coords = Set.union coords acc.coords, currentCoords = currentCoords }
+            { coords = Set.union coords acc.coords
+            , currentCoords = currentCoords
+            , orderedCoords = orderedCoords
+            }
 
         Left ->
             let
                 range =
                     getRange curX (curX - instruction.length)
 
-                ( coords, currentCoords ) =
+                ( coords, orderedCoords, currentCoords ) =
                     List.foldl
-                        (\nextX ( coordSet, _ ) ->
+                        (\nextX ( coordSet, prevOrderedCoords, _ ) ->
                             let
                                 latest =
                                     ( nextX, curY )
                             in
-                            ( Set.insert latest coordSet, latest )
+                            ( Set.insert latest coordSet, prevOrderedCoords, latest )
                         )
-                        ( Set.empty, acc.currentCoords )
+                        ( Set.empty, [], acc.currentCoords )
                         range
             in
-            { coords = Set.union coords acc.coords, currentCoords = currentCoords }
+            { coords = Set.union coords acc.coords
+            , currentCoords = currentCoords
+            , orderedCoords = orderedCoords
+            }
 
         Right ->
             let
                 range =
-                    getRange curX (curX - instruction.length)
+                    getRange curX (curX + instruction.length)
 
-                ( coords, currentCoords ) =
+                ( coords, orderedCoords, currentCoords ) =
                     List.foldl
-                        (\nextX ( coordSet, _ ) ->
+                        (\nextX ( coordSet, prevOrderedCoords, _ ) ->
                             let
                                 latest =
                                     ( nextX, curY )
                             in
-                            ( Set.insert latest coordSet, latest )
+                            ( Set.insert latest coordSet, prevOrderedCoords, latest )
                         )
-                        ( Set.empty, acc.currentCoords )
+                        ( Set.empty, [], acc.currentCoords )
                         range
             in
-            { coords = Set.union coords acc.coords, currentCoords = currentCoords }
+            { coords = Set.union coords acc.coords
+            , currentCoords = currentCoords
+            , orderedCoords = orderedCoords
+            }
 
 
 type alias InstructionGenerator =
     { currentCoords : Coords
     , coords : Set Coords
+    , orderedCoords : List Coords
     }
 
 
@@ -168,12 +181,17 @@ instructionsToCoords : List Instruction -> Set Coords
 instructionsToCoords instructions =
     List.foldl
         instructionToCoords
-        { coords = Set.empty, currentCoords = centralPort }
+        { coords = Set.empty, currentCoords = centralPort, orderedCoords = [] }
         instructions
         |> .coords
 
 
-partOne : String -> Solution Msg
+coordsToDist : Coords -> Int
+coordsToDist ( x, y ) =
+    abs x + abs y
+
+
+partOne : String -> Solution
 partOne input =
     let
         wires =
@@ -192,52 +210,32 @@ partOne input =
                     |> Result.andThen lineToInstructions
                     |> Result.map instructionsToCoords
                 )
-                |> Result.map (\( wireA, wireB ) -> Set.toList wireA ++ Set.toList wireB)
-                |> Result.map (coordsToRender >> H.div [
-                    A.style "margin-left" "200px"
-                    , A.style "margin-top" "200px"
-                    ])
+                |> Result.map
+                    (\( wireA, wireB ) ->
+                        Set.intersect wireA wireB
+                    )
+                |> Result.map Set.toList
+                |> Result.map
+                    (List.foldl
+                        (\sut champion ->
+                            if
+                                (coordsToDist sut < coordsToDist champion)
+                                    || (coordsToDist champion == 0)
+                            then
+                                sut
 
-        -- |> Result.map
-        --     (\( wireA, wireB ) ->
-        --         Set.intersect (Debug.log "Wire A" wireA) (Debug.log "Wire B" wireB)
-        --     )
-        -- |> Result.map Set.toList
-        -- |> Result.map
-        --     (List.foldl
-        --         (\sut champion ->
-        --             if Debug.log "sut" sut < champion && sut /= ( 0, 0 ) then
-        --                 sut
-        --             else
-        --                 champion
-        --         )
-        --         ( 0, 0 )
-        --     )
-        -- |> Result.map (\( x, y ) -> abs x + abs y |> String.fromInt)
-        -- |> Result.map (\( x, y ) -> "(" ++ String.fromInt x ++ "," ++ String.fromInt y ++ ")")
+                            else
+                                champion
+                        )
+                        ( 0, 0 )
+                    )
+                |> Result.map (coordsToDist >> String.fromInt)
     in
     wires
-        |> Result.mapError (\_ -> "could not parse input")
+        |> Result.mapError (\_ -> "Failed to parse")
 
 
-coordsToRender : List Coords -> List (H.Html Msg)
-coordsToRender coords =
-    List.map
-        (\( x, y ) ->
-            H.div
-                [ A.style "transform" <| "translateY(" ++ String.fromInt (y * 20) ++ "px)" ++ " translateX(" ++ String.fromInt (x * 20) ++ "px)"
-                , A.style "position" "absolute"
-                , A.style "font-family" "courier"
-                , A.style "width" "20px"
-                , A.style "width" "20px"
-                ]
-                [ H.text "#"
-                ]
-        )
-        (Debug.log "RENDER COORDS" coords)
-
-
-solve : Problem -> Solution Msg
+solve : Problem -> Solution
 solve problem =
     case problem.part of
         1 ->
@@ -250,17 +248,17 @@ solve problem =
                 )
 
 
-main : Program Problem (Solution Msg) Msg
+main : Program Problem Solution Never
 main =
     element
         { init = solve >> (\model -> ( model, Cmd.none ))
-        , view = Result.withDefault (H.div [A.style "padding-left" "200px"] [ H.text "Error" ])
+        , view = Result.map H.text >> Result.mapError H.text >> ResultX.merge
         , update = update
         , subscriptions = \_ -> Sub.none
         }
 
 
-update : Msg -> Solution Msg -> ( Solution Msg, Cmd Msg )
+update : Never -> Solution -> ( Solution, Cmd Never )
 update _ model =
     ( model, Cmd.none )
 
