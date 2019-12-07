@@ -3,6 +3,7 @@ module Day3 exposing (main)
 import Array exposing (Array)
 import Basics.Extra exposing (flip)
 import Browser exposing (element)
+import Dict exposing (Dict)
 import Html as H
 import Html.Attributes as A
 import List.Extra as ListX
@@ -194,16 +195,9 @@ coordsToDist ( x, y ) =
     abs x + abs y
 
 
-walkInstructions : Set Coords -> Array Instruction -> Int -> Int -> Coords -> Result String Int
-walkInstructions knownIntersections instructions currentIndex currentDistance currentCoords =
+walkInstructions : Coords -> Array Instruction -> Int -> Int -> Coords -> Result String Int
+walkInstructions targetIntersection instructions currentIndex currentDistance currentCoords =
     let
-        r =
-            Debug.log "walkInstructions"
-                { currentdistance = currentDistance
-                , currentCoords = currentCoords
-                , instruction = Array.get currentIndex instructions
-                }
-
         instruction =
             Array.get currentIndex instructions
 
@@ -219,7 +213,7 @@ walkInstructions knownIntersections instructions currentIndex currentDistance cu
                 |> Maybe.withDefault []
 
         incomingMatch =
-            ListX.find (flip Set.member <| knownIntersections) incomingCoords
+            ListX.find ((==) targetIntersection) incomingCoords
                 |> Maybe.andThen
                     (\val ->
                         if val == centralPort then
@@ -243,18 +237,12 @@ walkInstructions knownIntersections instructions currentIndex currentDistance cu
 
                 totalDist =
                     currentDistance + dist
-
-                l =
-                    Debug.log "PART 2 match" firstMatch
-
-                d =
-                    Debug.log "PART 2 distance" totalDist
             in
             Result.Ok totalDist
 
         ( _, Nothing, Just ( nextCoords, nextDistance ) ) ->
             walkInstructions
-                knownIntersections
+                targetIntersection
                 instructions
                 (currentIndex + 1)
                 nextDistance
@@ -262,6 +250,21 @@ walkInstructions knownIntersections instructions currentIndex currentDistance cu
 
         ( _, _, _ ) ->
             Result.Err "out of index and couldnt find match when walking instructions"
+
+
+walkIntersections : ( Array Instruction, Array Instruction ) -> Coords -> Dict Coords Int -> Dict Coords Int
+walkIntersections ( wireA, wireB ) currentIntersection results =
+    let
+        distanceResults =
+            Result.map2
+                Tuple.pair
+                (walkInstructions currentIntersection wireA 0 0 centralPort)
+                (walkInstructions currentIntersection wireB 0 0 centralPort)
+    in
+    Result.map
+        (\( distA, distB ) -> Dict.insert currentIntersection (distA + distB) results)
+        distanceResults
+        |> Result.withDefault results
 
 
 partTwo : String -> Solution
@@ -305,12 +308,26 @@ partTwo input =
         knownIntersections
         (Result.map2 Tuple.pair instructionListA instructionListB)
         |> Result.mapError (\_ -> "Failed to parse")
-        |> Result.andThen
+        |> Result.map
             (\( intersections_, ( instructionsA_, instructionsB_ ) ) ->
-                Result.map2
-                    (\distA distB -> String.fromInt <| distA + distB)
-                    (walkInstructions intersections_ (Array.fromList instructionsA_) 0 0 centralPort)
-                    (walkInstructions intersections_ (Array.fromList instructionsB_) 0 0 centralPort)
+                List.foldr
+                    (walkIntersections ( Array.fromList instructionsA_, Array.fromList instructionsB_ ))
+                    Dict.empty
+                    (Set.toList intersections_)
+            )
+        |> Result.map
+            (\resultDict ->
+                List.foldr
+                    (\current champion ->
+                        if current < champion || champion == 0 then
+                            current
+
+                        else
+                            champion
+                    )
+                    0
+                    (Dict.values resultDict)
+                    |> String.fromInt
             )
 
 
