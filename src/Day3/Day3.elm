@@ -1,8 +1,11 @@
 module Day3 exposing (main)
 
+import Array exposing (Array)
+import Basics.Extra exposing (flip)
 import Browser exposing (element)
 import Html as H
 import Html.Attributes as A
+import List.Extra as ListX
 import Parser exposing ((|.), (|=), Parser)
 import Platform exposing (Program)
 import Result.Extra as ResultX
@@ -93,7 +96,7 @@ instructionToCoords instruction acc =
                                 latest =
                                     ( curX, nextY )
                             in
-                            ( Set.insert latest coordSet, prevOrderedCoords, latest )
+                            ( Set.insert latest coordSet, prevOrderedCoords ++ [ latest ], latest )
                         )
                         ( Set.empty, [], acc.currentCoords )
                         range
@@ -115,7 +118,7 @@ instructionToCoords instruction acc =
                                 latest =
                                     ( curX, nextY )
                             in
-                            ( Set.insert latest coordSet, prevOrderedCoords, latest )
+                            ( Set.insert latest coordSet, prevOrderedCoords ++ [ latest ], latest )
                         )
                         ( Set.empty, [], acc.currentCoords )
                         range
@@ -137,7 +140,7 @@ instructionToCoords instruction acc =
                                 latest =
                                     ( nextX, curY )
                             in
-                            ( Set.insert latest coordSet, prevOrderedCoords, latest )
+                            ( Set.insert latest coordSet, prevOrderedCoords ++ [ latest ], latest )
                         )
                         ( Set.empty, [], acc.currentCoords )
                         range
@@ -159,7 +162,7 @@ instructionToCoords instruction acc =
                                 latest =
                                     ( nextX, curY )
                             in
-                            ( Set.insert latest coordSet, prevOrderedCoords, latest )
+                            ( Set.insert latest coordSet, prevOrderedCoords ++ [ latest ], latest )
                         )
                         ( Set.empty, [], acc.currentCoords )
                         range
@@ -189,6 +192,126 @@ instructionsToCoords instructions =
 coordsToDist : Coords -> Int
 coordsToDist ( x, y ) =
     abs x + abs y
+
+
+walkInstructions : Set Coords -> Array Instruction -> Int -> Int -> Coords -> Result String Int
+walkInstructions knownIntersections instructions currentIndex currentDistance currentCoords =
+    let
+        r =
+            Debug.log "walkInstructions"
+                { currentdistance = currentDistance
+                , currentCoords = currentCoords
+                , instruction = Array.get currentIndex instructions
+                }
+
+        instruction =
+            Array.get currentIndex instructions
+
+        incomingCoords =
+            Maybe.map
+                (\val ->
+                    instructionToCoords
+                        val
+                        { coords = Set.empty, currentCoords = currentCoords, orderedCoords = [] }
+                        |> .orderedCoords
+                )
+                instruction
+                |> Maybe.withDefault []
+
+        incomingMatch =
+            ListX.find (flip Set.member <| knownIntersections) incomingCoords
+                |> Maybe.andThen
+                    (\val ->
+                        if val == centralPort then
+                            Nothing
+
+                        else
+                            Just val
+                    )
+
+        nextCoordsAndDistance =
+            Maybe.map2
+                Tuple.pair
+                (ListX.last incomingCoords)
+                (Maybe.map (.length >> (+) currentDistance) instruction)
+    in
+    case ( instruction, incomingMatch, nextCoordsAndDistance ) of
+        ( _, Just firstMatch, _ ) ->
+            let
+                dist =
+                    ListX.elemIndex firstMatch incomingCoords |> Maybe.withDefault 0
+
+                totalDist =
+                    currentDistance + dist
+
+                l =
+                    Debug.log "PART 2 match" firstMatch
+
+                d =
+                    Debug.log "PART 2 distance" totalDist
+            in
+            Result.Ok totalDist
+
+        ( _, Nothing, Just ( nextCoords, nextDistance ) ) ->
+            walkInstructions
+                knownIntersections
+                instructions
+                (currentIndex + 1)
+                nextDistance
+                nextCoords
+
+        ( _, _, _ ) ->
+            Result.Err "out of index and couldnt find match when walking instructions"
+
+
+partTwo : String -> Solution
+partTwo input =
+    let
+        knownIntersections =
+            Result.map2
+                Tuple.pair
+                (String.split "\n" input
+                    |> List.head
+                    |> Result.fromMaybe []
+                    |> Result.andThen lineToInstructions
+                    |> Result.map instructionsToCoords
+                )
+                (String.split "\n" input
+                    |> List.reverse
+                    |> List.head
+                    |> Result.fromMaybe []
+                    |> Result.andThen lineToInstructions
+                    |> Result.map instructionsToCoords
+                )
+                |> Result.map
+                    (\( wireA, wireB ) ->
+                        Set.intersect wireA wireB
+                    )
+
+        instructionListA =
+            String.split "\n" input
+                |> List.head
+                |> Result.fromMaybe []
+                |> Result.andThen lineToInstructions
+
+        instructionListB =
+            String.split "\n" input
+                |> ListX.last
+                |> Result.fromMaybe []
+                |> Result.andThen lineToInstructions
+    in
+    Result.map2
+        Tuple.pair
+        knownIntersections
+        (Result.map2 Tuple.pair instructionListA instructionListB)
+        |> Result.mapError (\_ -> "Failed to parse")
+        |> Result.andThen
+            (\( intersections_, ( instructionsA_, instructionsB_ ) ) ->
+                Result.map2
+                    (\distA distB -> String.fromInt <| distA + distB)
+                    (walkInstructions intersections_ (Array.fromList instructionsA_) 0 0 centralPort)
+                    (walkInstructions intersections_ (Array.fromList instructionsB_) 0 0 centralPort)
+            )
 
 
 partOne : String -> Solution
@@ -240,6 +363,9 @@ solve problem =
     case problem.part of
         1 ->
             partOne problem.input
+
+        2 ->
+            partTwo problem.input
 
         _ ->
             Result.Err
