@@ -30,8 +30,8 @@ type alias Solution =
 -}
 
 
-isValidPassword : Int -> Bool
-isValidPassword passNum =
+isValidPassword : Bool -> Int -> Bool
+isValidPassword allowThree passNum =
     let
         digitList =
             String.fromInt passNum |> String.split ""
@@ -46,10 +46,26 @@ isValidPassword passNum =
                         found
 
                     else
-                        Maybe.map
+                        (Maybe.map
                             ((==) curDigit)
                             (Array.get (idx + 1) (Array.fromList digitList))
                             |> Maybe.withDefault False
+                        )
+                            && (allowThree
+                                    -- we need to check the number in front and behind do not match
+                                    -- else it is a three-in-a-row
+                                    || ((Maybe.map
+                                            ((/=) curDigit)
+                                            (Array.get (idx + 2) (Array.fromList digitList))
+                                            |> Maybe.withDefault True
+                                        )
+                                            && (Maybe.map
+                                                    ((/=) curDigit)
+                                                    (Array.get (idx - 1) (Array.fromList digitList))
+                                                    |> Maybe.withDefault True
+                                               )
+                                       )
+                               )
                 )
                 False
                 digitList
@@ -72,13 +88,32 @@ isValidPassword passNum =
     isSixDigit && hasDouble && noDecrease
 
 
+isValidPasswordPartOne : Int -> Bool
+isValidPasswordPartOne =
+    isValidPassword True
+
+
+isValidPasswordPartTwo : Int -> Bool
+isValidPasswordPartTwo =
+    isValidPassword False
+
+
 partOne : String -> Solution
 partOne input =
-    let
-        inputRange =
-            List.range 246515 739105
-    in
-    Result.Ok input
+    List.range 246515 739105
+        |> List.filter isValidPasswordPartOne
+        |> List.length
+        |> String.fromInt
+        |> Result.Ok
+
+
+partTwo : String -> Solution
+partTwo input =
+    List.range 246515 739105
+        |> List.filter isValidPasswordPartTwo
+        |> List.length
+        |> String.fromInt
+        |> Result.Ok
 
 
 solve : Problem -> Solution
@@ -86,6 +121,9 @@ solve problem =
     case problem.part of
         1 ->
             partOne problem.input
+
+        2 ->
+            partTwo problem.input
 
         _ ->
             Result.Err
