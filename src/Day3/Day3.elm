@@ -40,6 +40,16 @@ type alias Coords =
     ( Int, Int )
 
 
+setY : Coords -> Int -> Coords
+setY coords val =
+    Tuple.mapSecond (\_ -> val) coords
+
+
+setX : Coords -> Int -> Coords
+setX coords val =
+    Tuple.mapFirst (\_ -> val) coords
+
+
 centralPort : Coords
 centralPort =
     ( 0, 0 )
@@ -76,6 +86,42 @@ getRange start end =
 
     else
         List.range start end
+
+
+instructionToCoordsList : Coords -> Instruction -> List Coords
+instructionToCoordsList startCoords instruction =
+    let
+        ( x, y ) =
+            startCoords
+
+        ( range, setter ) =
+            case instruction.direction of
+                Up ->
+                    ( getRange y (y - instruction.length)
+                    , setY startCoords
+                    )
+
+                Down ->
+                    ( getRange y (y + instruction.length)
+                    , setY startCoords
+                    )
+
+                Left ->
+                    ( getRange x (x - instruction.length)
+                    , setX startCoords
+                    )
+
+                Right ->
+                    ( getRange x (x + instruction.length)
+                    , setX startCoords
+                    )
+    in
+    List.foldl
+        (\newCoord outputCoords ->
+            outputCoords ++ [ setter newCoord ]
+        )
+        []
+        range
 
 
 instructionToCoords : Instruction -> InstructionGenerator -> InstructionGenerator

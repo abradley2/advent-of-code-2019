@@ -1,4 +1,4 @@
-module Day1 exposing (main)
+module Day4 exposing (main)
 
 import Browser exposing (element)
 import Html as H
@@ -18,7 +18,7 @@ type alias Solution =
 
 partOne : String -> Solution
 partOne input =
-    Result.Err "No solution for part one"
+    Result.Ok input
 
 
 solve : Problem -> Solution

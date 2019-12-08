@@ -1,5 +1,5 @@
-import { Elm } from "./Day1.elm";
+import { Elm } from "./Day4.elm";
 import PartOne from "./PartOne.txt";
 import { mountSolution } from "../advent-utils";
 
-mountSolution(Elm.Day1, 1, PartOne);
+mountSolution(Elm.Day4, 1, PartOne);
