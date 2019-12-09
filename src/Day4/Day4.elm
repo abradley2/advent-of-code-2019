@@ -46,14 +46,15 @@ isValidPassword allowThree passNum =
                         found
 
                     else
+                        -- look ahead one and check if there is a match to determine if this is a "double"
                         (Maybe.map
                             ((==) curDigit)
                             (Array.get (idx + 1) (Array.fromList digitList))
                             |> Maybe.withDefault False
                         )
                             && (allowThree
-                                    -- we need to check the number in front and behind do not match
-                                    -- else it is a three-in-a-row
+                                    -- in the case of a double we need to check if the number an additional
+                                    -- spot up, and the number on spot back is a match else it is a 3+ not a double
                                     || ((Maybe.map
                                             ((/=) curDigit)
                                             (Array.get (idx + 2) (Array.fromList digitList))
