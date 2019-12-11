@@ -21,40 +21,55 @@ type alias Solution =
 type Operation
     = Add AddOperands
     | Multiply MultiplyOperands
-    | ToggleMode Mode
     | End
 
 
-type Mode
-    = Unknown
-    | Immediate
-    | Posotional
+type Mode a
+    = Immediate a
+    | Positional a
 
 
 type alias AddOperands =
-    { x : Int
-    , y : Int
-    , pos : Int
+    { x : Mode Int
+    , y : Mode Int
+    , pos : Mode Int
     }
 
 
 type alias MultiplyOperands =
-    { x : Int
-    , y : Int
-    , pos : Int
+    { x : Mode Int
+    , y : Mode Int
+    , pos : Mode Int
     }
+
+
+resolveOperand op opcodeArray =
+    case op of
+        Positional val ->
+            Array.get val opcodeArray
+
+        Immediate val ->
+            Just val
 
 
 resolveOperation : Int -> Array Int -> Operation -> Result String (Array Int)
 resolveOperation currentPlace array operation =
     case operation of
         Add addOperands ->
-            Array.set addOperands.pos (addOperands.x + addOperands.y) array
-                |> Result.Ok
+            Maybe.map3
+                (\x y pos -> Array.set pos (x + y) array)
+                (resolveOperand addOperands.x array)
+                (resolveOperand addOperands.y array)
+                (resolveOperand addOperands.pos array)
+                |> Result.fromMaybe "Failed to resolve operands"
 
         Multiply multiplyOperands ->
-            Array.set multiplyOperands.pos (multiplyOperands.x + multiplyOperands.y) array
-                |> Result.Ok
+            Maybe.map3
+                (\x y pos -> Array.set pos (x * y) array)
+                (resolveOperand multiplyOperands.x array)
+                (resolveOperand multiplyOperands.y array)
+                (resolveOperand multiplyOperands.pos array)
+                |> Result.fromMaybe "Failed to resolve operands"
 
         _ ->
             Result.Err ("Unresolvable operation at: " ++ String.fromInt currentPlace)
@@ -80,17 +95,17 @@ readOpcodeArray currentPlace array =
                             1 ->
                                 Maybe.map3
                                     AddOperands
-                                    (valueFromPos (currentPlace + 1) array)
-                                    (valueFromPos (currentPlace + 2) array)
-                                    (Array.get (currentPlace + 3) array)
+                                    (valueFromPos (currentPlace + 1) array |> Maybe.map Immediate)
+                                    (valueFromPos (currentPlace + 2) array |> Maybe.map Immediate)
+                                    (Array.get (currentPlace + 3) array |> Maybe.map Immediate)
                                     |> Maybe.map (Add >> Tuple.pair 3)
 
                             2 ->
                                 Maybe.map3
                                     MultiplyOperands
-                                    (valueFromPos (currentPlace + 1) array)
-                                    (valueFromPos (currentPlace + 2) array)
-                                    (Array.get (currentPlace + 3) array)
+                                    (valueFromPos (currentPlace + 1) array |> Maybe.map Immediate)
+                                    (valueFromPos (currentPlace + 2) array |> Maybe.map Immediate)
+                                    (Array.get (currentPlace + 3) array |> Maybe.map Immediate)
                                     |> Maybe.map (Multiply >> Tuple.pair 3)
 
                             99 ->
