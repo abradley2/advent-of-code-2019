@@ -82,14 +82,25 @@ type alias OperationResult =
     }
 
 
-debugOpcodes : Array Int -> String
-debugOpcodes opcodes =
-    "\n"
-        ++ (Array.toList opcodes
-                |> List.map String.fromInt
-                |> List.intersperse ","
-                |> List.foldr (++) ""
-           )
+debugOpcodes : Int -> Array Int -> String
+debugOpcodes position opcodes =
+    let
+        stringified =
+            Array.map String.fromInt opcodes
+
+        annotated =
+            Maybe.map
+                (\problemChild -> Array.set position ("**" ++ problemChild) stringified)
+                (Array.get position stringified)
+    in
+    annotated
+        |> Maybe.map Array.toList
+        |> Maybe.map (List.intersperse ",")
+        |> Maybe.map (List.foldr (++) "")
+        |> Maybe.withDefault
+            ("Unknown error position "
+                ++ String.fromInt position
+            )
 
 
 resolveOperation : Int -> Array Int -> ( Int, Array Int ) -> List Int -> Operation -> Result String OperationResult
@@ -104,7 +115,7 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
                 (\input pos -> Array.set pos input array)
                 (Array.get inputIdx inputs)
                 (resolveOperand moveInputOperands.pos array)
-                |> Result.fromMaybe ("failed to resolve move input operands at position " ++ position ++ debugOpcodes array)
+                |> Result.fromMaybe ("failed to resolve move input operands at position " ++ position ++ debugOpcodes currentPlace array)
                 |> Result.map
                     (\opcodes ->
                         OperationResult
@@ -117,7 +128,7 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
             Maybe.map
                 (\outputValue -> ( array, outputValue ))
                 (resolveOperand outputValueOperands.value array)
-                |> Result.fromMaybe ("failed to resolve move value operands at position " ++ position ++ debugOpcodes array)
+                |> Result.fromMaybe ("failed to resolve move value operands at position " ++ position ++ debugOpcodes currentPlace array)
                 |> Result.map
                     (\( opcodes, outputValue ) ->
                         OperationResult
@@ -132,7 +143,7 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
                 (resolveOperand addOperands.x array)
                 (resolveOperand addOperands.y array)
                 (resolveOperand addOperands.pos array)
-                |> Result.fromMaybe ("Failed to resolve add operands at position " ++ position ++ debugOpcodes array)
+                |> Result.fromMaybe ("Failed to resolve add operands at position " ++ position ++ debugOpcodes currentPlace array)
                 |> Result.map
                     (\opcodes ->
                         OperationResult
@@ -147,7 +158,7 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
                 (resolveOperand multiplyOperands.x array)
                 (resolveOperand multiplyOperands.y array)
                 (resolveOperand multiplyOperands.pos array)
-                |> Result.fromMaybe ("Failed to resolve multiply operands at position " ++ position ++ debugOpcodes array)
+                |> Result.fromMaybe ("Failed to resolve multiply operands at position " ++ position ++ debugOpcodes currentPlace array)
                 |> Result.map
                     (\opcodes ->
                         OperationResult
@@ -157,7 +168,7 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
                     )
 
         _ ->
-            Result.Err ("Unresolvable operation at: " ++ position ++ debugOpcodes array)
+            Result.Err ("Unresolvable operation at: " ++ position ++ debugOpcodes currentPlace array)
 
 
 valueFromPos : Int -> Array Int -> Maybe Int
