@@ -75,34 +75,46 @@ resolveOperand op opcodeArray =
             Just val
 
 
-resolveOperation : Int -> Array Int -> Operation -> Result String (Array Int)
-resolveOperation currentPlace array operation =
+type alias OperationResult =
+    { opcodes : Array Int
+    , nextInputIdx : Int
+    , output : List Int
+    }
+
+
+resolveOperation : Int -> Array Int -> ( Int, Array Int ) -> List Int -> Operation -> Result String OperationResult
+resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
     let
         position =
             String.fromInt currentPlace
     in
     case operation of
         MoveInput moveInputOperands ->
-            Maybe.map
-                -- set = position value
-                (\pos -> Array.set pos 1 array)
+            Maybe.map2
+                (\input pos -> Array.set pos input array)
+                (Array.get inputIdx inputs)
                 (resolveOperand moveInputOperands.pos array)
                 |> Result.fromMaybe ("failed to resolve move input operands at position " ++ position)
+                |> Result.map
+                    (\opcodes ->
+                        OperationResult
+                            opcodes
+                            (inputIdx + 1)
+                            outputs
+                    )
 
         OutputValue outputValueOperands ->
             Maybe.map
-                (\posValue ->
-                    let
-                        curPlace =
-                            Debug.log "Current place" currentPlace
-
-                        outputValue =
-                            Debug.log "OUTPUT$$$$" posValue
-                    in
-                    array
-                )
+                (\outputValue -> ( array, outputValue ))
                 (resolveOperand outputValueOperands.value array)
                 |> Result.fromMaybe ("failed to resolve move value operands at position " ++ position)
+                |> Result.map
+                    (\( opcodes, outputValue ) ->
+                        OperationResult
+                            opcodes
+                            inputIdx
+                            (outputs ++ [ outputValue ])
+                    )
 
         Add addOperands ->
             Maybe.map3
@@ -111,6 +123,13 @@ resolveOperation currentPlace array operation =
                 (resolveOperand addOperands.y array)
                 (resolveOperand addOperands.pos array)
                 |> Result.fromMaybe ("Failed to resolve add operands at position " ++ position)
+                |> Result.map
+                    (\opcodes ->
+                        OperationResult
+                            opcodes
+                            inputIdx
+                            outputs
+                    )
 
         Multiply multiplyOperands ->
             Maybe.map3
@@ -119,6 +138,13 @@ resolveOperation currentPlace array operation =
                 (resolveOperand multiplyOperands.y array)
                 (resolveOperand multiplyOperands.pos array)
                 |> Result.fromMaybe ("Failed to resolve multiply operands at position " ++ position)
+                |> Result.map
+                    (\opcodes ->
+                        OperationResult
+                            opcodes
+                            inputIdx
+                            outputs
+                    )
 
         _ ->
             Result.Err ("Unresolvable operation at: " ++ position)
@@ -223,8 +249,8 @@ codeToOperation currentPlace array mapFirst mapSecond mapThird op =
                 |> MaybeX.join
 
 
-readOpcodeArray : Int -> Array Int -> Result String (Array Int)
-readOpcodeArray currentPlace array =
+readOpcodeArray : Int -> ( Int, Array Int ) -> List Int -> Array Int -> Result String (List Int)
+readOpcodeArray currentPlace ( inputIdx, inputs ) outputs array =
     let
         mCurrentOp =
             Array.get currentPlace array
@@ -238,11 +264,18 @@ readOpcodeArray currentPlace array =
         Just _ ->
             case mOperation of
                 Just ( _, End ) ->
-                    Result.Ok array
+                    Result.Ok outputs
 
                 Just ( readLength, operation ) ->
-                    resolveOperation currentPlace array operation
-                        |> Result.andThen (readOpcodeArray (currentPlace + 1 + readLength))
+                    resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation
+                        |> Result.andThen
+                            (\result ->
+                                readOpcodeArray
+                                    (currentPlace + 1 + readLength)
+                                    ( result.nextInputIdx, inputs )
+                                    result.output
+                                    result.opcodes
+                            )
 
                 Nothing ->
                     Result.Err ("Unknown operation found at: " ++ String.fromInt currentPlace)
@@ -252,15 +285,12 @@ readOpcodeArray currentPlace array =
 
 
 partOne : String -> Solution
-partOne input =
-    let
-        result =
-            input
-                |> inputToArray
-                |> Result.map (readOpcodeArray 0)
-                |> Debug.log "RESULT"
-    in
-    Result.Ok input
+partOne =
+    inputToArray
+        >> Result.andThen (readOpcodeArray 0 ( 0, Array.fromList [ 1 ] ) [])
+        >> Result.map (List.map String.fromInt)
+        >> Result.map (List.intersperse ",")
+        >> Result.map (List.foldr (++) ",")
 
 
 solve : Problem -> Solution
