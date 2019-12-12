@@ -24,6 +24,7 @@ type Operation
     | Multiply MultiplyOperands
     | MoveInput MoveInputOperands
     | OutputValue OutputValueOperands
+    | JumpIfTrue JumpIfTrueOperands
     | End
 
 
@@ -39,6 +40,12 @@ type Operation
 type Mode a
     = Immediate a
     | Positional a
+
+
+type alias JumpIfTrueOperands =
+    { shouldJump : Mode Int
+    , jumpTo : Mode Int
+    }
 
 
 type alias MoveInputOperands =
@@ -79,6 +86,7 @@ type alias OperationResult =
     { opcodes : Array Int
     , nextInputIdx : Int
     , output : List Int
+    , jumpTo : Maybe Int
     }
 
 
@@ -110,6 +118,27 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
             String.fromInt currentPlace
     in
     case operation of
+        JumpIfTrue jumpIfTrueOperands ->
+            Maybe.map2
+                (\shouldJump jumpTo ->
+                    if shouldJump == 0 then
+                        Nothing
+
+                    else
+                        Just jumpTo
+                )
+                (resolveOperand jumpIfTrueOperands.shouldJump array)
+                (resolveOperand jumpIfTrueOperands.jumpTo array)
+                |> Result.fromMaybe ("failed to resolve jumpto operands at position " ++ position ++ debugOpcodes currentPlace array)
+                |> Result.map
+                    (\jumpTo ->
+                        OperationResult
+                            array
+                            inputIdx
+                            outputs
+                            jumpTo
+                    )
+
         MoveInput moveInputOperands ->
             Maybe.map2
                 (\input pos -> Array.set pos input array)
@@ -122,6 +151,7 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
                             opcodes
                             (inputIdx + 1)
                             outputs
+                            Nothing
                     )
 
         OutputValue outputValueOperands ->
@@ -135,6 +165,7 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
                             opcodes
                             inputIdx
                             (outputs ++ [ outputValue ])
+                            Nothing
                     )
 
         Add addOperands ->
@@ -150,6 +181,7 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
                             opcodes
                             inputIdx
                             outputs
+                            Nothing
                     )
 
         Multiply multiplyOperands ->
@@ -165,6 +197,7 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
                             opcodes
                             inputIdx
                             outputs
+                            Nothing
                     )
 
         _ ->
@@ -232,6 +265,13 @@ codeToOperation currentPlace array mapFirst mapSecond mapThird op =
                 (Array.get (currentPlace + 1) array |> Maybe.map Positional)
                 |> Maybe.map (OutputValue >> Tuple.pair 1)
 
+        5 ->
+            Maybe.map2
+                JumpIfTrueOperands
+                (Array.get (currentPlace + 1) array |> Maybe.map mapFirst)
+                (Array.get (currentPlace + 2) array |> Maybe.map mapSecond)
+                |> Maybe.map (JumpIfTrue >> Tuple.pair 2)
+
         99 ->
             Just ( 0, End )
 
@@ -291,8 +331,15 @@ readOpcodeArray currentPlace ( inputIdx, inputs ) outputs array =
                     resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation
                         |> Result.andThen
                             (\result ->
+                                let
+                                    nextPos =
+                                        Maybe.map
+                                            (\val -> val)
+                                            result.jumpTo
+                                            |> Maybe.withDefault (currentPlace + 1 + readLength)
+                                in
                                 readOpcodeArray
-                                    (currentPlace + 1 + readLength)
+                                    nextPos
                                     ( result.nextInputIdx, inputs )
                                     result.output
                                     result.opcodes
