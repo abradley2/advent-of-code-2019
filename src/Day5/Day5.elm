@@ -299,10 +299,10 @@ readOpcodeArray currentPlace ( inputIdx, inputs ) outputs array =
                             )
 
                 Nothing ->
-                    Result.Err ("Unknown operation found at: " ++ String.fromInt currentPlace)
+                    Result.Err ("Unknown operation found at: " ++ String.fromInt currentPlace ++ debugOpcodes currentPlace array)
 
         Nothing ->
-            Result.Err "Ran out of index without End operation"
+            Result.Err ("Ran out of index without End operation" ++ debugOpcodes currentPlace array)
 
 
 partOne : String -> Solution
