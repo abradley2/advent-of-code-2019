@@ -25,21 +25,35 @@ type Operation
     | MoveInput MoveInputOperands
     | OutputValue OutputValueOperands
     | JumpIfTrue JumpIfTrueOperands
+    | JumpIfFalse JumpIfFalseOperands
+    | IsLessThan IsLessThanOperands
+    | IsEqualTo IsEqualToOperands
     | End
-
-
-
-{-
-   Opcode 3 takes a single integer as input and saves it to the position given by its only parameter.
-   For example, the instruction 3,50 would take an input value and store it at address 50.
-
-   Opcode 4 outputs the value of its only parameter. For example, the instruction 4,50 would output the value at address 50.
--}
 
 
 type Mode a
     = Immediate a
     | Positional a
+
+
+type alias IsLessThanOperands =
+    { x : Mode Int
+    , y : Mode Int
+    , pos : Mode Int
+    }
+
+
+type alias IsEqualToOperands =
+    { x : Mode Int
+    , y : Mode Int
+    , pos : Mode Int
+    }
+
+
+type alias JumpIfFalseOperands =
+    { shouldJump : Mode Int
+    , jumpTo : Mode Int
+    }
 
 
 type alias JumpIfTrueOperands =
@@ -118,6 +132,50 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
             String.fromInt currentPlace
     in
     case operation of
+        IsLessThan isLessThanOperands ->
+            Maybe.map3
+                (\x y pos ->
+                    if x < y then
+                        ( pos, 1 )
+
+                    else
+                        ( pos, 0 )
+                )
+                (resolveOperand isLessThanOperands.x array)
+                (resolveOperand isLessThanOperands.y array)
+                (resolveOperand isLessThanOperands.pos array)
+                |> Result.fromMaybe ("failed to resolve IsLessThan operands at position " ++ position ++ debugOpcodes currentPlace array)
+                |> Result.map
+                    (\( pos, value ) ->
+                        OperationResult
+                            (Array.set pos value array)
+                            inputIdx
+                            outputs
+                            Nothing
+                    )
+
+        IsEqualTo isEqualToOperands ->
+            Maybe.map3
+                (\x y pos ->
+                    if x == y then
+                        ( pos, 1 )
+
+                    else
+                        ( pos, 0 )
+                )
+                (resolveOperand isEqualToOperands.x array)
+                (resolveOperand isEqualToOperands.y array)
+                (resolveOperand isEqualToOperands.pos array)
+                |> Result.fromMaybe ("failed to resolve IsEqualTo operands at position " ++ position ++ debugOpcodes currentPlace array)
+                |> Result.map
+                    (\( pos, value ) ->
+                        OperationResult
+                            (Array.set pos value array)
+                            inputIdx
+                            outputs
+                            Nothing
+                    )
+
         JumpIfTrue jumpIfTrueOperands ->
             Maybe.map2
                 (\shouldJump jumpTo ->
@@ -130,6 +188,27 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
                 (resolveOperand jumpIfTrueOperands.shouldJump array)
                 (resolveOperand jumpIfTrueOperands.jumpTo array)
                 |> Result.fromMaybe ("failed to resolve jumpto operands at position " ++ position ++ debugOpcodes currentPlace array)
+                |> Result.map
+                    (\jumpTo ->
+                        OperationResult
+                            array
+                            inputIdx
+                            outputs
+                            jumpTo
+                    )
+
+        JumpIfFalse jumpIfFalseOperands ->
+            Maybe.map2
+                (\shouldJump jumpTo ->
+                    if shouldJump == 0 then
+                        Just jumpTo
+
+                    else
+                        Nothing
+                )
+                (resolveOperand jumpIfFalseOperands.shouldJump array)
+                (resolveOperand jumpIfFalseOperands.jumpTo array)
+                |> Result.fromMaybe ("failed to resolve JumpIfFalse operands at position " ++ position ++ debugOpcodes currentPlace array)
                 |> Result.map
                     (\jumpTo ->
                         OperationResult
@@ -272,6 +351,29 @@ codeToOperation currentPlace array mapFirst mapSecond mapThird op =
                 (Array.get (currentPlace + 2) array |> Maybe.map mapSecond)
                 |> Maybe.map (JumpIfTrue >> Tuple.pair 2)
 
+        6 ->
+            Maybe.map2
+                JumpIfFalseOperands
+                (Array.get (currentPlace + 1) array |> Maybe.map mapFirst)
+                (Array.get (currentPlace + 2) array |> Maybe.map mapSecond)
+                |> Maybe.map (JumpIfFalse >> Tuple.pair 2)
+
+        7 ->
+            Maybe.map3
+                IsLessThanOperands
+                (Array.get (currentPlace + 1) array |> Maybe.map mapFirst)
+                (Array.get (currentPlace + 2) array |> Maybe.map mapSecond)
+                (Array.get (currentPlace + 3) array |> Maybe.map Immediate)
+                |> Maybe.map (IsLessThan >> Tuple.pair 3)
+
+        8 ->
+            Maybe.map3
+                IsEqualToOperands
+                (Array.get (currentPlace + 1) array |> Maybe.map mapFirst)
+                (Array.get (currentPlace + 2) array |> Maybe.map mapSecond)
+                (Array.get (currentPlace + 3) array |> Maybe.map Immediate)
+                |> Maybe.map (IsEqualTo >> Tuple.pair 3)
+
         99 ->
             Just ( 0, End )
 
@@ -361,11 +463,23 @@ partOne =
         >> Result.map (List.foldr (++) ",")
 
 
+partTwo : String -> Solution
+partTwo =
+    inputToArray
+        >> Result.andThen (readOpcodeArray 0 ( 0, Array.fromList [ 5 ] ) [])
+        >> Result.map (List.map String.fromInt)
+        >> Result.map (List.intersperse ",")
+        >> Result.map (List.foldr (++) ",")
+
+
 solve : Problem -> Solution
 solve problem =
     case problem.part of
         1 ->
             partOne problem.input
+
+        2 ->
+            partTwo problem.input
 
         _ ->
             Result.Err
