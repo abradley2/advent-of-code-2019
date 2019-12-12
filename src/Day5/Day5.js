@@ -1,4 +1,4 @@
-import { Elm } from "./Day1.elm";
+import { Elm } from "./Day5.elm";
 import PartOne from "./PartOne.txt";
 import { mountSolution } from "../advent-utils";
 
