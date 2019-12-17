@@ -158,49 +158,43 @@ closestIntersect pathA pathB =
         pathA
 
 
+distanceToSanta : Node -> Result String String
+distanceToSanta solarSystem =
+    let
+        pathResults =
+            Maybe.map2
+                Tuple.pair
+                (getNumberOfOrbits "YOU" 0 [] solarSystem |> Maybe.map Tuple.second)
+                (getNumberOfOrbits "SAN" 0 [] solarSystem |> Maybe.map Tuple.second)
+
+        closestIntersectResult =
+            pathResults
+                |> Maybe.andThen (\( a, b ) -> closestIntersect a b)
+    in
+    Maybe.map2
+        (\intersect ( pathA, pathB ) ->
+            Maybe.map2
+                (\idxA idxB ->
+                    sliceFromIndex idxA pathA ++ sliceFromIndex idxB pathB
+                )
+                (ListX.elemIndex intersect pathA)
+                (ListX.elemIndex intersect pathB)
+        )
+        closestIntersectResult
+        pathResults
+        |> MaybeX.join
+        -- remove duplicate
+        |> Maybe.map ListX.unique
+        -- don't count the initial orbits
+        |> Maybe.map (List.length >> flip (-) 3 >> String.fromInt)
+        |> Result.fromMaybe "Could not find distance"
+
+
 partTwo : String -> Solution
 partTwo input =
     inputToOrbitDict input
-        |> Result.andThen
-            (\( allOrbits, sun ) ->
-                let
-                    solarSystem =
-                        buildSolarSystem allOrbits "COM"
-
-                    pathMeResult =
-                        getNumberOfOrbits "YOU" 0 [] solarSystem
-
-                    pathSantaResult =
-                        getNumberOfOrbits "SAN" 0 [] solarSystem
-
-                    lastIntersect =
-                        Maybe.map2
-                            (\a b -> ( closestIntersect a b, a, b ))
-                            (Maybe.map Tuple.second pathMeResult)
-                            (Maybe.map Tuple.second pathSantaResult)
-                            |> Maybe.andThen
-                                (\( mIntersect, idxA, idxB ) ->
-                                    Maybe.map
-                                        (\intersect -> ( intersect, idxA, idxB ))
-                                        mIntersect
-                                )
-                            |> Maybe.andThen
-                                (\( intersect, pathA, pathB ) ->
-                                    Maybe.map2
-                                        (\idxA idxB ->
-                                            sliceFromIndex idxA pathA ++ sliceFromIndex idxB pathB
-                                        )
-                                        (ListX.elemIndex intersect pathA)
-                                        (ListX.elemIndex intersect pathB)
-                                )
-                            -- remove duplicate
-                            |> Maybe.map ListX.unique
-                            -- don't count the initial orbits
-                            |> Maybe.map (List.length >> flip (-) 3 >> String.fromInt)
-                            |> Result.fromMaybe "Could not find distance"
-                in
-                lastIntersect
-            )
+        |> Result.map (\( allOrbits, _ ) -> buildSolarSystem allOrbits "COM")
+        |> Result.andThen distanceToSanta
 
 
 partOne : String -> Solution
