@@ -1,11 +1,9 @@
 module Day6 exposing (main)
 
 import Browser exposing (element)
-import Dict exposing (Dict)
 import Html as H
 import List.Extra as ListX
 import Maybe.Extra as MaybeX
-import Parser exposing ((|.), (|=), Parser)
 import Platform exposing (Program)
 import Result.Extra as ResultX
 import Set exposing (Set)
@@ -112,23 +110,6 @@ addPlanet name targetParent node =
                     )
 
 
-sampleTree : Node
-sampleTree =
-    Planet "A"
-        [ Planet "B"
-            [ Planet "C"
-                [ Planet "E" []
-                , Planet "X" []
-                ]
-            ]
-        , Planet "D" []
-        ]
-
-
-xOrbit =
-    getNumberOfOrbits "X" 0 sampleTree
-
-
 type alias Problem =
     { input : String
     , part : Int
@@ -157,7 +138,7 @@ partOne input =
                             (\planetTag totalDist ->
                                 let
                                     distResult =
-                                        getNumberOfOrbits  planetTag 0 solarSystem
+                                        getNumberOfOrbits planetTag 0 solarSystem
                                             |> Result.fromMaybe "distance not found"
                                 in
                                 Result.map
