@@ -1,6 +1,5 @@
 module Day6 exposing (main)
 
-import Array
 import Basics.Extra exposing (flip)
 import Browser exposing (element)
 import Html as H
@@ -8,7 +7,7 @@ import List.Extra as ListX
 import Maybe.Extra as MaybeX
 import Platform exposing (Program)
 import Result.Extra as ResultX
-import Set exposing (Set)
+import Set
 
 
 type alias Orbit =
@@ -37,13 +36,6 @@ getChildren orbits parent =
         (.parent >> (==) parent)
         orbits
         |> List.map .child
-
-
-planetVar =
-    { start = Char.isUpper
-    , inner = Char.isUpper
-    , reserved = Set.fromList [ ")" ]
-    }
 
 
 parseLine : String -> Result String Orbit
