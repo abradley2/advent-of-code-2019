@@ -10,7 +10,8 @@
     "Day3": "parcel serve ./src/Day3/index.html",
     "Day4": "parcel serve ./src/Day4/index.html",
     "Day5": "parcel serve ./src/Day5/index.html",
-    "Day6": "parcel serve ./src/Day6/index.html"
+    "Day6": "parcel serve ./src/Day6/index.html",
+    "Day7": "parcel serve ./src/Day7/index.html"
   },
   "author": "",
   "license": "ISC",
