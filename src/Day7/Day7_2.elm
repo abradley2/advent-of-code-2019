@@ -788,15 +788,15 @@ inputSet =
     }
 
 
-nextPermutation : Inputs -> Result String Inputs
-nextPermutation inputs =
+nextPermutation : Int -> Inputs -> Result String Inputs
+nextPermutation max inputs =
     let
         prospectNext =
-            if inputs.a == 4 then
-                if inputs.b == 4 then
-                    if inputs.c == 4 then
-                        if inputs.d == 4 then
-                            if inputs.e == 4 then
+            if inputs.a == max then
+                if inputs.b == max then
+                    if inputs.c == max then
+                        if inputs.d == max then
+                            if inputs.e == max then
                                 Result.Err "Reached end"
 
                             else
@@ -822,7 +822,7 @@ nextPermutation inputs =
                     [ n.a, n.b, n.c, n.d, n.e ]
             in
             if (Set.fromList list |> Set.size) /= List.length list then
-                nextPermutation n
+                nextPermutation max n
 
             else
                 Result.Ok n
@@ -843,11 +843,16 @@ sampleInput =
     "3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54,-5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4,53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10"
 
 
+
+-- 139629729
+-- 139629729
+
+
 partTwo : String -> Solution
 partTwo input =
     let
         d =
-            initialize input (Inputs 9 7 8 5 6)
+            initialize input (Inputs 9 8 7 6 5)
                 |> Result.andThen (stepComputerModel 0 "a")
                 |> Debug.log "INITIALIZED"
     in
