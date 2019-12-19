@@ -395,7 +395,7 @@ codeToOperation currentPlace array mapFirst mapSecond mapThird op =
                 |> Maybe.map (IsEqualTo >> Tuple.pair 3)
 
         99 ->
-            Debug.log "REACHED HALT" <| Just ( 0, End )
+            Just ( 0, End )
 
         _ ->
             let
@@ -451,13 +451,6 @@ type alias ComputerModel =
 
 stepComputerModel : Int -> String -> ComputerModel -> Result String Int
 stepComputerModel input nodeTag model =
-    let
-        a =
-            Debug.log "NEXT INPUT" input
-
-        b =
-            Debug.log "NODE TAG" nodeTag
-    in
     -- so what node are we currently evaluating?
     case nodeTag of
         "a" ->
@@ -492,6 +485,9 @@ stepComputerModel input nodeTag model =
                                         stepComputerModel output "b" { model | a = RequestInput nextReadArgs }
                                     )
 
+                        Result.Ok Exit ->
+                            Result.Ok input
+
                         Result.Err err ->
                             Result.Err err
 
@@ -502,6 +498,9 @@ stepComputerModel input nodeTag model =
                             (\output ->
                                 stepComputerModel output "b" { model | a = RequestInput nextReadArgs }
                             )
+
+                Exit ->
+                    Result.Ok input
 
         "b" ->
             case model.b of
@@ -535,6 +534,9 @@ stepComputerModel input nodeTag model =
                                         stepComputerModel output "c" { model | b = RequestInput nextReadArgs }
                                     )
 
+                        Result.Ok Exit ->
+                            Result.Ok input
+
                         Result.Err err ->
                             Result.Err err
 
@@ -545,6 +547,9 @@ stepComputerModel input nodeTag model =
                             (\output ->
                                 stepComputerModel output "c" { model | b = RequestInput nextReadArgs }
                             )
+
+                Exit ->
+                    Result.Ok input
 
         "c" ->
             case model.c of
@@ -578,6 +583,9 @@ stepComputerModel input nodeTag model =
                                         stepComputerModel output "d" { model | c = RequestInput nextReadArgs }
                                     )
 
+                        Result.Ok Exit ->
+                            Result.Ok input
+
                         Result.Err err ->
                             Result.Err err
 
@@ -588,6 +596,9 @@ stepComputerModel input nodeTag model =
                             (\output ->
                                 stepComputerModel output "d" { model | c = RequestInput nextReadArgs }
                             )
+
+                Exit ->
+                    Result.Ok input
 
         "d" ->
             case model.d of
@@ -621,6 +632,9 @@ stepComputerModel input nodeTag model =
                                         stepComputerModel output "e" { model | d = RequestInput nextReadArgs }
                                     )
 
+                        Result.Ok Exit ->
+                            Result.Ok input
+
                         Result.Err err ->
                             Result.Err err
 
@@ -631,6 +645,9 @@ stepComputerModel input nodeTag model =
                             (\output ->
                                 stepComputerModel output "e" { model | d = RequestInput nextReadArgs }
                             )
+
+                Exit ->
+                    Result.Ok input
 
         "e" ->
             case model.e of
@@ -664,6 +681,9 @@ stepComputerModel input nodeTag model =
                                         stepComputerModel output "a" { model | e = RequestInput nextReadArgs }
                                     )
 
+                        Result.Ok Exit ->
+                            Result.Ok input
+
                         Result.Err err ->
                             Result.Err err
 
@@ -674,6 +694,9 @@ stepComputerModel input nodeTag model =
                             (\output ->
                                 stepComputerModel output "a" { model | e = RequestInput nextReadArgs }
                             )
+
+                Exit ->
+                    Result.Ok input
 
         _ ->
             Result.Err "Program tried to execute opcode on unknown node"
@@ -698,6 +721,7 @@ initialize str inputs =
 type ReadStatus
     = RequestInput ReadArgs
     | Output ReadArgs (List Int)
+    | Exit
 
 
 readOpcodeArray : ReadArgs -> Result String ReadStatus
@@ -727,7 +751,7 @@ readOpcodeArray readArgs =
         Just _ ->
             case mOperation of
                 Just ( _, End ) ->
-                    Result.Ok (Output readArgs outputs)
+                    Result.Ok Exit
 
                 Just ( readLength, operation ) ->
                     resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation
@@ -765,7 +789,6 @@ readOpcodeArray readArgs =
                                             }
                                             result.output
                                             |> Result.Ok
-                                            |> Debug.log "EMIT OUTPUT"
 
                                     WaitForInput ->
                                         Result.Ok <| RequestInput readArgs
@@ -850,13 +873,9 @@ sampleInput =
 
 partTwo : String -> Solution
 partTwo input =
-    let
-        d =
-            initialize input (Inputs 9 8 7 6 5)
-                |> Result.andThen (stepComputerModel 0 "a")
-                |> Debug.log "INITIALIZED"
-    in
-    Result.Ok input
+    initialize input (Inputs 9 8 7 6 5)
+        |> Result.andThen (stepComputerModel 0 "a")
+        |> Result.map String.fromInt
 
 
 solve : Problem -> Solution
