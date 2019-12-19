@@ -127,7 +127,12 @@ debugOpcodes position opcodes =
             )
 
 
-resolveOperation : Int -> Array Int -> ( Int, Array Int ) -> List Int -> Operation -> Result String OperationResult
+type OperationStatus
+    = Done OperationResult
+    | WaitForInput
+
+
+resolveOperation : Int -> Array Int -> ( Int, Array Int ) -> List Int -> Operation -> Result String OperationStatus
 resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
     let
         position =
@@ -155,6 +160,7 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
                             outputs
                             Nothing
                     )
+                |> Result.map Done
 
         IsEqualTo isEqualToOperands ->
             Maybe.map3
@@ -177,6 +183,7 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
                             outputs
                             Nothing
                     )
+                |> Result.map Done
 
         JumpIfTrue jumpIfTrueOperands ->
             Maybe.map2
@@ -198,6 +205,7 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
                             outputs
                             jumpTo
                     )
+                |> Result.map Done
 
         JumpIfFalse jumpIfFalseOperands ->
             Maybe.map2
@@ -219,21 +227,27 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
                             outputs
                             jumpTo
                     )
+                |> Result.map Done
 
         MoveInput moveInputOperands ->
-            Maybe.map2
-                (\input pos -> Array.set pos input array)
-                (Array.get inputIdx inputs)
-                (resolveOperand moveInputOperands.pos array)
-                |> Result.fromMaybe ("failed to resolve move input operands at position " ++ position ++ debugOpcodes currentPlace array)
-                |> Result.map
-                    (\opcodes ->
-                        OperationResult
-                            opcodes
-                            (inputIdx + 1)
-                            outputs
-                            Nothing
-                    )
+            case Array.get inputIdx inputs of
+                Just input ->
+                    Maybe.map
+                        (\pos -> Array.set pos input array)
+                        (resolveOperand moveInputOperands.pos array)
+                        |> Result.fromMaybe ("failed to resolve move input operands at position " ++ position ++ debugOpcodes currentPlace array)
+                        |> Result.map
+                            (\opcodes ->
+                                OperationResult
+                                    opcodes
+                                    (inputIdx + 1)
+                                    outputs
+                                    Nothing
+                            )
+                        |> Result.map Done
+
+                Nothing ->
+                    Result.Ok WaitForInput
 
         OutputValue outputValueOperands ->
             Maybe.map
@@ -248,6 +262,7 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
                             (outputs ++ [ outputValue ])
                             Nothing
                     )
+                |> Result.map Done
 
         Add addOperands ->
             Maybe.map3
@@ -264,6 +279,7 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
                             outputs
                             Nothing
                     )
+                |> Result.map Done
 
         Multiply multiplyOperands ->
             Maybe.map3
@@ -280,6 +296,7 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
                             outputs
                             Nothing
                     )
+                |> Result.map Done
 
         _ ->
             Result.Err ("Unresolvable operation at: " ++ position ++ debugOpcodes currentPlace array)
@@ -414,9 +431,59 @@ codeToOperation currentPlace array mapFirst mapSecond mapThird op =
                 |> MaybeX.join
 
 
-readOpcodeArray : Int -> ( Int, Array Int ) -> List Int -> Array Int -> Result String (List Int)
-readOpcodeArray currentPlace ( inputIdx, inputs ) outputs array =
+type alias ReadArgs =
+    { currentPos : Int
+    , inputData : ( Int, Array Int )
+    , outputs : List Int
+    , opcodes : Array Int
+    }
+
+
+type alias ComputerModel =
+    { a : ReadStatus
+    , b : ReadStatus
+    , c : ReadStatus
+    , d : ReadStatus
+    , e : ReadStatus
+    }
+
+
+initialize : String -> Inputs -> Result String ComputerModel
+initialize str inputs =
+    case inputToArray str of
+        Result.Ok opcodes ->
+            Result.map5
+                ComputerModel
+                (readOpcodeArray (ReadArgs 0 ( 0, Array.fromList [ inputs.a ] ) [] opcodes))
+                (readOpcodeArray (ReadArgs 0 ( 0, Array.fromList [ inputs.b ] ) [] opcodes))
+                (readOpcodeArray (ReadArgs 0 ( 0, Array.fromList [ inputs.c ] ) [] opcodes))
+                (readOpcodeArray (ReadArgs 0 ( 0, Array.fromList [ inputs.d ] ) [] opcodes))
+                (readOpcodeArray (ReadArgs 0 ( 0, Array.fromList [ inputs.e ] ) [] opcodes))
+
+        Result.Err err ->
+            Result.Err err
+
+
+type ReadStatus
+    = RequestInput ReadArgs
+    | Output (List Int)
+
+
+readOpcodeArray : ReadArgs -> Result String ReadStatus
+readOpcodeArray readArgs =
     let
+        currentPlace =
+            readArgs.currentPos
+
+        outputs =
+            readArgs.outputs
+
+        array =
+            readArgs.opcodes
+
+        ( inputIdx, inputs ) =
+            readArgs.inputData
+
         mCurrentOp =
             Array.get currentPlace array
 
@@ -429,24 +496,30 @@ readOpcodeArray currentPlace ( inputIdx, inputs ) outputs array =
         Just _ ->
             case mOperation of
                 Just ( _, End ) ->
-                    Result.Ok outputs
+                    Result.Ok (Output outputs)
 
                 Just ( readLength, operation ) ->
                     resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation
                         |> Result.andThen
-                            (\result ->
-                                let
-                                    nextPos =
-                                        Maybe.map
-                                            (\val -> val)
-                                            result.jumpTo
-                                            |> Maybe.withDefault (currentPlace + 1 + readLength)
-                                in
-                                readOpcodeArray
-                                    nextPos
-                                    ( result.nextInputIdx, inputs )
-                                    result.output
-                                    result.opcodes
+                            (\operationStatus ->
+                                case operationStatus of
+                                    Done result ->
+                                        let
+                                            nextPos =
+                                                Maybe.map
+                                                    (\val -> val)
+                                                    result.jumpTo
+                                                    |> Maybe.withDefault (currentPlace + 1 + readLength)
+                                        in
+                                        readOpcodeArray
+                                            { currentPos = nextPos
+                                            , inputData = ( result.nextInputIdx, inputs )
+                                            , outputs = result.output
+                                            , opcodes = result.opcodes
+                                            }
+
+                                    WaitForInput ->
+                                        Result.Ok <| RequestInput readArgs
                             )
 
                 Nothing ->
@@ -454,17 +527,6 @@ readOpcodeArray currentPlace ( inputIdx, inputs ) outputs array =
 
         Nothing ->
             Result.Err ("Ran out of index without End operation" ++ debugOpcodes currentPlace array)
-
-
-pipeOutput : Array Int -> Int -> Int -> Result String (List Int)
-pipeOutput input phaseSetting prevOutput =
-    readOpcodeArray 0 ( 0, Array.fromList [ phaseSetting, prevOutput ] ) [] input
-
-
-getOutput : List Int -> Result String Int
-getOutput =
-    ListX.last
-        >> Result.fromMaybe "program did not emit output"
 
 
 inputSet : Inputs
@@ -528,81 +590,25 @@ type alias Inputs =
     }
 
 
-processSolution : Array Int -> Inputs -> Solution
-processSolution opcodes computerInputs =
-    readOpcodeArray 0 ( 0, Array.fromList [ computerInputs.a, 0 ] ) [] opcodes
-        |> Result.andThen getOutput
-        |> Result.andThen (pipeOutput opcodes computerInputs.b)
-        |> Result.andThen getOutput
-        |> Result.andThen (pipeOutput opcodes computerInputs.c)
-        |> Result.andThen getOutput
-        |> Result.andThen (pipeOutput opcodes computerInputs.d)
-        |> Result.andThen getOutput
-        |> Result.andThen (pipeOutput opcodes computerInputs.e)
-        |> Result.andThen getOutput
-        |> Result.map String.fromInt
+sampleInput =
+    "3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54,-5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4,53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10"
 
 
-processAllSolutions : Array Int -> Inputs -> List String -> List String
-processAllSolutions opcodes inputs results =
+partTwo : String -> Solution
+partTwo input =
     let
-        nextResults =
-            Result.map
-                (\solution -> solution :: results)
-                (processSolution opcodes (Debug.log "PROCESSING FOR" inputs) |> Debug.log "PROCESSING RESULTS")
-                |> Result.withDefault results
-
-        nextInputs =
-            nextPermutation inputs
+        d =
+            initialize input (Inputs 9 7 8 5 6)
+                |> Debug.log "INITIALIZED"
     in
-    case nextInputs of
-        Result.Ok next ->
-            processAllSolutions opcodes next nextResults
-
-        Result.Err _ ->
-            results
-
-
-partOne : String -> Solution
-partOne input =
-    -- 998120 is wrong
-    -- 43210
-    let
-        -- 1,0,4,3,2
-        debug =
-            input
-                |> inputToArray
-                |> Result.map
-                    (\opcodes ->
-                        processSolution opcodes { a = 0, b = 1, c = 2, d = 3, e = 4 }
-                    )
-    in
-    input
-        |> inputToArray
-        |> Result.map
-            (\opcodes ->
-                processAllSolutions opcodes inputSet []
-            )
-        |> Result.map (List.map (String.toInt >> Maybe.withDefault -1))
-        |> Result.map
-            (List.foldr
-                (\cur champ ->
-                    if cur > champ then
-                        cur
-
-                    else
-                        champ
-                )
-                0
-            )
-        |> Result.map String.fromInt
+    Result.Ok input
 
 
 solve : Problem -> Solution
 solve problem =
     case problem.part of
-        1 ->
-            partOne problem.input
+        2 ->
+            partTwo problem.input
 
         _ ->
             Result.Err
