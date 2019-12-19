@@ -448,6 +448,232 @@ type alias ComputerModel =
     }
 
 
+stepComputerModel : Int -> String -> ComputerModel -> Result String Int
+stepComputerModel input nodeTag model =
+    let
+        a =
+            Debug.log "NEXT INPUT" input
+
+        b =
+            Debug.log "NODE TAG" nodeTag
+    in
+    -- so what node are we currently evaluating?
+    case nodeTag of
+        "a" ->
+            case model.a of
+                -- we have an input and one is requested, we can now fulfill
+                RequestInput readArgs ->
+                    let
+                        -- give the input we now have and execute a new read
+                        withRequestedInput =
+                            readOpcodeArray { readArgs | inputData = ( 0, Array.fromList [ input ] ) }
+                    in
+                    case withRequestedInput of
+                        -- afterwards it will request input again, to get this we need to move to the next step of the machine
+                        Result.Ok (RequestInput nextReadArgs) ->
+                            ListX.last nextReadArgs.outputs
+                                |> Result.fromMaybe "No outputs"
+                                |> Result.andThen
+                                    (\output ->
+                                        stepComputerModel output
+                                            "b"
+                                            { model
+                                                | a = RequestInput nextReadArgs
+                                            }
+                                    )
+
+                        -- or it just has output and we need to forward it to the next step
+                        Result.Ok (Output outputs) ->
+                            ListX.last outputs
+                                |> Result.fromMaybe "No outputs"
+                                |> Result.andThen
+                                    (\output ->
+                                        stepComputerModel output "b" model
+                                    )
+
+                        Result.Err err ->
+                            Result.Err err
+
+                Output outputs ->
+                    ListX.last outputs
+                        |> Result.fromMaybe "No outputs"
+                        |> Result.andThen
+                            (\output ->
+                                stepComputerModel output "b" model
+                            )
+
+        "b" ->
+            case model.b of
+                -- we have an input and one is requested, we can now fulfill
+                RequestInput readArgs ->
+                    let
+                        -- give the input we now have and execute a new read
+                        withRequestedInput =
+                            readOpcodeArray { readArgs | inputData = ( 0, Array.fromList [ input ] ) }
+                    in
+                    case withRequestedInput of
+                        -- afterwards it will request input again, to get this we need to move to the next step of the machine
+                        Result.Ok (RequestInput nextReadArgs) ->
+                            ListX.last nextReadArgs.outputs
+                                |> Result.fromMaybe "No outputs"
+                                |> Result.andThen
+                                    (\output ->
+                                        stepComputerModel output
+                                            "c"
+                                            { model
+                                                | a = RequestInput nextReadArgs
+                                            }
+                                    )
+
+                        -- or it just has output and we need to forward it to the next step
+                        Result.Ok (Output outputs) ->
+                            ListX.last outputs
+                                |> Result.fromMaybe "No outputs"
+                                |> Result.andThen
+                                    (\output ->
+                                        stepComputerModel output "c" model
+                                    )
+
+                        Result.Err err ->
+                            Result.Err err
+
+                Output outputs ->
+                    ListX.last outputs
+                        |> Result.fromMaybe "No outputs"
+                        |> Result.andThen
+                            (\output ->
+                                stepComputerModel output "b" model
+                            )
+
+        "c" ->
+            case model.c of
+                -- we have an input and one is requested, we can now fulfill
+                RequestInput readArgs ->
+                    let
+                        -- give the input we now have and execute a new read
+                        withRequestedInput =
+                            readOpcodeArray { readArgs | inputData = ( 0, Array.fromList [ input ] ) }
+                    in
+                    case withRequestedInput of
+                        -- afterwards it will request input again, to get this we need to move to the next step of the machine
+                        Result.Ok (RequestInput nextReadArgs) ->
+                            ListX.last nextReadArgs.outputs
+                                |> Result.fromMaybe "No outputs"
+                                |> Result.andThen
+                                    (\output ->
+                                        stepComputerModel output
+                                            "d"
+                                            { model
+                                                | a = RequestInput nextReadArgs
+                                            }
+                                    )
+
+                        -- or it just has output and we need to forward it to the next step
+                        Result.Ok (Output outputs) ->
+                            ListX.last outputs
+                                |> Result.fromMaybe "No outputs"
+                                |> Result.andThen
+                                    (\output ->
+                                        stepComputerModel output "d" model
+                                    )
+
+                        Result.Err err ->
+                            Result.Err err
+
+                Output outputs ->
+                    ListX.last outputs
+                        |> Result.fromMaybe "No outputs"
+                        |> Result.andThen
+                            (\output ->
+                                stepComputerModel output "d" model
+                            )
+
+        "d" ->
+            case model.d of
+                -- we have an input and one is requested, we can now fulfill
+                RequestInput readArgs ->
+                    let
+                        -- give the input we now have and execute a new read
+                        withRequestedInput =
+                            readOpcodeArray { readArgs | inputData = ( 0, Array.fromList [ input ] ) }
+                    in
+                    case withRequestedInput of
+                        -- afterwards it will request input again, to get this we need to move to the next step of the machine
+                        Result.Ok (RequestInput nextReadArgs) ->
+                            ListX.last nextReadArgs.outputs
+                                |> Result.fromMaybe "No outputs"
+                                |> Result.andThen
+                                    (\output ->
+                                        stepComputerModel output
+                                            "e"
+                                            { model
+                                                | a = RequestInput nextReadArgs
+                                            }
+                                    )
+
+                        -- or it just has output and we need to forward it to the next step
+                        Result.Ok (Output outputs) ->
+                            ListX.last outputs
+                                |> Result.fromMaybe "No outputs"
+                                |> Result.andThen
+                                    (\output ->
+                                        stepComputerModel output "e" model
+                                    )
+
+                        Result.Err err ->
+                            Result.Err err
+
+                Output outputs ->
+                    ListX.last outputs
+                        |> Result.fromMaybe "No outputs"
+                        |> Result.andThen
+                            (\output ->
+                                stepComputerModel output "e" model
+                            )
+
+        "e" ->
+            case model.e of
+                -- we have an input and one is requested, we can now fulfill
+                RequestInput readArgs ->
+                    let
+                        -- give the input we now have and execute a new read
+                        withRequestedInput =
+                            readOpcodeArray { readArgs | inputData = ( 0, Array.fromList [ input ] ) }
+                    in
+                    case withRequestedInput of
+                        -- afterwards it will request input again, to get this we need to move to the next step of the machine
+                        Result.Ok (RequestInput nextReadArgs) ->
+                            ListX.last nextReadArgs.outputs
+                                |> Result.fromMaybe "No outputs"
+                                |> Result.andThen
+                                    (\output ->
+                                        stepComputerModel output
+                                            "a"
+                                            { model
+                                                | a = RequestInput nextReadArgs
+                                            }
+                                    )
+
+                        -- or it just has output and we need to forward it to the next step
+                        Result.Ok (Output outputs) ->
+                            ListX.last outputs
+                                |> Result.fromMaybe "No outputs"
+                                |> Result.andThen
+                                    (\output ->
+                                        stepComputerModel output "a" model
+                                    )
+
+                        Result.Err err ->
+                            Result.Err err
+
+                Output outputs ->
+                    ListX.last outputs
+                        |> Result.fromMaybe "No outputs"
+
+        _ ->
+            Result.Err "Program tried to execute opcode on unknown node"
+
+
 initialize : String -> Inputs -> Result String ComputerModel
 initialize str inputs =
     case inputToArray str of
@@ -599,6 +825,7 @@ partTwo input =
     let
         d =
             initialize input (Inputs 9 7 8 5 6)
+                |> Result.andThen (stepComputerModel 0 "a")
                 |> Debug.log "INITIALIZED"
     in
     Result.Ok input
