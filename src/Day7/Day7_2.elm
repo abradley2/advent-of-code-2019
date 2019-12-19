@@ -129,6 +129,7 @@ debugOpcodes position opcodes =
 
 type OperationStatus
     = Done OperationResult
+    | EmitOutput OperationResult
     | WaitForInput
 
 
@@ -262,7 +263,7 @@ resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation =
                             (outputs ++ [ outputValue ])
                             Nothing
                     )
-                |> Result.map Done
+                |> Result.map EmitOutput
 
         Add addOperands ->
             Maybe.map3
@@ -394,7 +395,7 @@ codeToOperation currentPlace array mapFirst mapSecond mapThird op =
                 |> Maybe.map (IsEqualTo >> Tuple.pair 3)
 
         99 ->
-            Just ( 0, End )
+            Debug.log "REACHED HALT" <| Just ( 0, End )
 
         _ ->
             let
@@ -483,23 +484,23 @@ stepComputerModel input nodeTag model =
                                     )
 
                         -- or it just has output and we need to forward it to the next step
-                        Result.Ok (Output outputs) ->
+                        Result.Ok (Output nextReadArgs outputs) ->
                             ListX.last outputs
                                 |> Result.fromMaybe "No outputs"
                                 |> Result.andThen
                                     (\output ->
-                                        stepComputerModel output "b" model
+                                        stepComputerModel output "b" { model | a = RequestInput nextReadArgs }
                                     )
 
                         Result.Err err ->
                             Result.Err err
 
-                Output outputs ->
+                Output nextReadArgs outputs ->
                     ListX.last outputs
                         |> Result.fromMaybe "No outputs"
                         |> Result.andThen
                             (\output ->
-                                stepComputerModel output "b" model
+                                stepComputerModel output "b" { model | a = RequestInput nextReadArgs }
                             )
 
         "b" ->
@@ -521,28 +522,28 @@ stepComputerModel input nodeTag model =
                                         stepComputerModel output
                                             "c"
                                             { model
-                                                | a = RequestInput nextReadArgs
+                                                | b = RequestInput nextReadArgs
                                             }
                                     )
 
                         -- or it just has output and we need to forward it to the next step
-                        Result.Ok (Output outputs) ->
+                        Result.Ok (Output nextReadArgs outputs) ->
                             ListX.last outputs
                                 |> Result.fromMaybe "No outputs"
                                 |> Result.andThen
                                     (\output ->
-                                        stepComputerModel output "c" model
+                                        stepComputerModel output "c" { model | b = RequestInput nextReadArgs }
                                     )
 
                         Result.Err err ->
                             Result.Err err
 
-                Output outputs ->
+                Output nextReadArgs outputs ->
                     ListX.last outputs
                         |> Result.fromMaybe "No outputs"
                         |> Result.andThen
                             (\output ->
-                                stepComputerModel output "b" model
+                                stepComputerModel output "c" { model | b = RequestInput nextReadArgs }
                             )
 
         "c" ->
@@ -564,28 +565,28 @@ stepComputerModel input nodeTag model =
                                         stepComputerModel output
                                             "d"
                                             { model
-                                                | a = RequestInput nextReadArgs
+                                                | c = RequestInput nextReadArgs
                                             }
                                     )
 
                         -- or it just has output and we need to forward it to the next step
-                        Result.Ok (Output outputs) ->
+                        Result.Ok (Output nextReadArgs outputs) ->
                             ListX.last outputs
                                 |> Result.fromMaybe "No outputs"
                                 |> Result.andThen
                                     (\output ->
-                                        stepComputerModel output "d" model
+                                        stepComputerModel output "d" { model | c = RequestInput nextReadArgs }
                                     )
 
                         Result.Err err ->
                             Result.Err err
 
-                Output outputs ->
+                Output nextReadArgs outputs ->
                     ListX.last outputs
                         |> Result.fromMaybe "No outputs"
                         |> Result.andThen
                             (\output ->
-                                stepComputerModel output "d" model
+                                stepComputerModel output "d" { model | c = RequestInput nextReadArgs }
                             )
 
         "d" ->
@@ -607,28 +608,28 @@ stepComputerModel input nodeTag model =
                                         stepComputerModel output
                                             "e"
                                             { model
-                                                | a = RequestInput nextReadArgs
+                                                | d = RequestInput nextReadArgs
                                             }
                                     )
 
                         -- or it just has output and we need to forward it to the next step
-                        Result.Ok (Output outputs) ->
+                        Result.Ok (Output nextReadArgs outputs) ->
                             ListX.last outputs
                                 |> Result.fromMaybe "No outputs"
                                 |> Result.andThen
                                     (\output ->
-                                        stepComputerModel output "e" model
+                                        stepComputerModel output "e" { model | d = RequestInput nextReadArgs }
                                     )
 
                         Result.Err err ->
                             Result.Err err
 
-                Output outputs ->
+                Output nextReadArgs outputs ->
                     ListX.last outputs
                         |> Result.fromMaybe "No outputs"
                         |> Result.andThen
                             (\output ->
-                                stepComputerModel output "e" model
+                                stepComputerModel output "e" { model | d = RequestInput nextReadArgs }
                             )
 
         "e" ->
@@ -650,25 +651,29 @@ stepComputerModel input nodeTag model =
                                         stepComputerModel output
                                             "a"
                                             { model
-                                                | a = RequestInput nextReadArgs
+                                                | e = RequestInput nextReadArgs
                                             }
                                     )
 
                         -- or it just has output and we need to forward it to the next step
-                        Result.Ok (Output outputs) ->
+                        Result.Ok (Output nextReadArgs outputs) ->
                             ListX.last outputs
                                 |> Result.fromMaybe "No outputs"
                                 |> Result.andThen
                                     (\output ->
-                                        stepComputerModel output "a" model
+                                        stepComputerModel output "a" { model | e = RequestInput nextReadArgs }
                                     )
 
                         Result.Err err ->
                             Result.Err err
 
-                Output outputs ->
+                Output nextReadArgs outputs ->
                     ListX.last outputs
                         |> Result.fromMaybe "No outputs"
+                        |> Result.andThen
+                            (\output ->
+                                stepComputerModel output "a" { model | e = RequestInput nextReadArgs }
+                            )
 
         _ ->
             Result.Err "Program tried to execute opcode on unknown node"
@@ -692,7 +697,7 @@ initialize str inputs =
 
 type ReadStatus
     = RequestInput ReadArgs
-    | Output (List Int)
+    | Output ReadArgs (List Int)
 
 
 readOpcodeArray : ReadArgs -> Result String ReadStatus
@@ -722,7 +727,7 @@ readOpcodeArray readArgs =
         Just _ ->
             case mOperation of
                 Just ( _, End ) ->
-                    Result.Ok (Output outputs)
+                    Result.Ok (Output readArgs outputs)
 
                 Just ( readLength, operation ) ->
                     resolveOperation currentPlace array ( inputIdx, inputs ) outputs operation
@@ -743,6 +748,24 @@ readOpcodeArray readArgs =
                                             , outputs = result.output
                                             , opcodes = result.opcodes
                                             }
+
+                                    EmitOutput result ->
+                                        let
+                                            nextPos =
+                                                Maybe.map
+                                                    (\val -> val)
+                                                    result.jumpTo
+                                                    |> Maybe.withDefault (currentPlace + 1 + readLength)
+                                        in
+                                        Output
+                                            { currentPos = nextPos
+                                            , inputData = ( result.nextInputIdx, inputs )
+                                            , outputs = result.output
+                                            , opcodes = result.opcodes
+                                            }
+                                            result.output
+                                            |> Result.Ok
+                                            |> Debug.log "EMIT OUTPUT"
 
                                     WaitForInput ->
                                         Result.Ok <| RequestInput readArgs
