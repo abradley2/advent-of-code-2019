@@ -811,8 +811,8 @@ inputSet =
     }
 
 
-nextPermutation : Int -> Inputs -> Result String Inputs
-nextPermutation max inputs =
+nextPermutation : Int -> Int -> Inputs -> Result String Inputs
+nextPermutation min max inputs =
     let
         prospectNext =
             if inputs.a == max then
@@ -823,16 +823,16 @@ nextPermutation max inputs =
                                 Result.Err "Reached end"
 
                             else
-                                Result.Ok { inputs | e = inputs.e + 1, d = 0, c = 0, b = 0, a = 0 }
+                                Result.Ok { inputs | e = inputs.e + 1, d = min, c = min, b = min, a = min }
 
                         else
-                            Result.Ok { inputs | d = inputs.d + 1, c = 0, b = 0, a = 0 }
+                            Result.Ok { inputs | d = inputs.d + 1, c = min, b = min, a = min }
 
                     else
-                        Result.Ok { inputs | c = inputs.c + 1, b = 0, a = 0 }
+                        Result.Ok { inputs | c = inputs.c + 1, b = min, a = min }
 
                 else
-                    Result.Ok { inputs | b = inputs.b + 1, a = 0 }
+                    Result.Ok { inputs | b = inputs.b + 1, a = min }
 
             else
                 Result.Ok { inputs | a = inputs.a + 1 }
@@ -845,7 +845,7 @@ nextPermutation max inputs =
                     [ n.a, n.b, n.c, n.d, n.e ]
             in
             if (Set.fromList list |> Set.size) /= List.length list then
-                nextPermutation max n
+                nextPermutation min max n
 
             else
                 Result.Ok n
@@ -871,10 +871,61 @@ sampleInput =
 -- 139629729
 
 
-partTwo : String -> Solution
-partTwo input =
-    initialize input (Inputs 9 8 7 6 5)
+evaluateInputs : String -> Inputs -> Result String Int
+evaluateInputs opcodeString inputs =
+    initialize opcodeString inputs
         |> Result.andThen (stepComputerModel 0 "a")
+
+
+evaluateInputPermuations : String -> Inputs -> List (Result String Int) -> List (Result String Int)
+evaluateInputPermuations opcodeString inputs prevSolutions =
+    let
+        nextInputs =
+            nextPermutation 5 9 inputs |> Debug.log "NEXT INPUT"
+
+        nextSolution =
+            evaluateInputs opcodeString inputs |> Debug.log "NEXT SOLUTION"
+    in
+    case nextInputs of
+        Result.Ok goNext ->
+            evaluateInputPermuations opcodeString goNext (nextSolution :: prevSolutions)
+
+        Result.Err _ ->
+            nextSolution :: prevSolutions
+
+
+{-| sampleOne = 139629729
+-}
+sampleOne =
+    ( "3,26,1001,26,-4,26,3,27,1002,27,2,27,1,27,26,27,4,27,1001,28,-1,28,1005,28,6,99,0,0,5"
+    , Inputs 9 8 7 6 5
+    )
+
+
+{-| sampleTwo = 18216
+-}
+sampleTwo =
+    ( "3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54,-5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4,53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10"
+    , Inputs 9 7 8 5 6
+    )
+
+
+partTwo : String -> Solution
+partTwo opcodeString =
+    -- evaluateInputs (Tuple.first sampleOne) (Tuple.second sampleOne)
+    --     |> Result.map String.fromInt
+    -- evaluateInputs (Tuple.first sampleTwo) (Tuple.second sampleTwo)
+    --     |> Result.map String.fromInt
+    -- evaluateInputs opcodeString (Inputs 9 8 7 6 5)
+    --     |> Result.map String.fromInt
+    let
+        -- 10496650 == too high
+        allResults =
+            evaluateInputPermuations opcodeString (Inputs 5 5 5 5 5) []
+    in
+    allResults
+        |> ResultX.combine
+        |> Result.andThen (ListX.maximumBy (\val -> val) >> Result.fromMaybe "NO MAX FOUND")
         |> Result.map String.fromInt
 
 
