@@ -680,6 +680,7 @@ stepComputerModel input nodeTag model =
                                     (\output ->
                                         stepComputerModel output "a" { model | e = RequestInput nextReadArgs }
                                     )
+                                << Debug.log "OUTPUT"
 
                         Result.Ok Exit ->
                             Result.Ok input
@@ -881,10 +882,10 @@ evaluateInputPermuations : String -> Inputs -> List (Result String Int) -> List 
 evaluateInputPermuations opcodeString inputs prevSolutions =
     let
         nextInputs =
-            nextPermutation 5 9 inputs |> Debug.log "NEXT INPUT"
+            nextPermutation 5 9 inputs
 
         nextSolution =
-            evaluateInputs opcodeString inputs |> Debug.log "NEXT SOLUTION"
+            evaluateInputs opcodeString inputs
     in
     case nextInputs of
         Result.Ok goNext ->
@@ -925,6 +926,7 @@ partTwo opcodeString =
     in
     allResults
         |> ResultX.combine
+        |> Result.map (List.filter (\v -> v < 10496650))
         |> Result.andThen (ListX.maximumBy (\val -> val) >> Result.fromMaybe "NO MAX FOUND")
         |> Result.map String.fromInt
 
